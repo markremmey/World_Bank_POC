@@ -75,7 +75,7 @@ def run(inputData: dict):
         # Extract metadata
         date = blob_metadata.get("date", "N/A")
         document_type = blob_metadata.get("document_type", "N/A")
-        persona = blob_metadata.get("persona", "N/A")
+        # persona = blob_metadata.get("persona", "N/A")
         supplier_name = blob_metadata.get("supplier_name", "N/A")
         contract_number = blob_metadata.get("contract_number", "N/A")
         amount = blob_metadata.get("amount", "N/A")
@@ -90,7 +90,7 @@ def run(inputData: dict):
         metadata_text = "\n".join([
             f"Date: {date if date else ''}",
             f"Document Type: {document_type if document_type else ''}",
-            f"Persona: {persona if persona else ''}", 
+            # f"Persona: {persona if persona else ''}", 
             f"supplier_name: {supplier_name if supplier_name else ''}",
             f"contract_number: {contract_number if contract_number else ''}",
             f"amount: {amount if amount else ''}"
