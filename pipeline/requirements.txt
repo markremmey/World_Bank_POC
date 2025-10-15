@@ -12,6 +12,7 @@ azure-ai-textanalytics==5.2.0
 azure-core==1.32.0
 azure-cosmos==4.9.0
 azure-functions==1.21.3
+PyPDF2==3.0.1
 azure-functions-durable==1.2.10
 azure-identity==1.19.0
 azure-storage-blob==12.24.0

@@ -19,16 +19,16 @@ def load_prompts_from_blob(prompt_file):
         raise RuntimeError(f"Failed to load prompts file: {prompt_file} from blob storage. Prompt File should be a valid Blob path stored in the prompts container. Error: {e}")
     
 
-def load_prompts_from_blob(prompt_file):
-    """Load the prompt from YAML file in blob storage and return as a dictionary."""
-    try:
-        prompt_yaml = get_blob_content("prompts", prompt_file).decode('utf-8')
-        prompts = yaml.safe_load(prompt_yaml)
-        prompts_json = json.dumps(prompts, indent=4)
-        prompts = json.loads(prompts_json) 
-        return prompts
-    except Exception as e:
-        raise RuntimeError(f"Failed to load prompts from blob storage: {e}")
+# def load_prompts_from_blob(prompt_file):
+#     """Load the prompt from YAML file in blob storage and return as a dictionary."""
+#     try:
+#         prompt_yaml = get_blob_content("prompts", prompt_file).decode('utf-8')
+#         prompts = yaml.safe_load(prompt_yaml)
+#         prompts_json = json.dumps(prompts, indent=4)
+#         prompts = json.loads(prompts_json) 
+#         return prompts
+#     except Exception as e:
+#         raise RuntimeError(f"Failed to load prompts from blob storage: {e}")
     
 
 def load_prompts():
