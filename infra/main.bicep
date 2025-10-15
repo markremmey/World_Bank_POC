@@ -763,6 +763,7 @@ module storage './modules/storage/storage-account.bicep' = {
     containers: [
       { name: 'bronze', publicAccess: 'None' }
       { name: 'silver', publicAccess: 'None' }
+      { name: 'pre-gold', publicAccess: 'None' }  
       { name: 'gold', publicAccess: 'None' }      
       { name: 'prompts', publicAccess: 'None' }      
     ]
