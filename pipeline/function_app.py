@@ -10,6 +10,10 @@ from configuration import Configuration
 from pipelineUtils.prompts import load_prompts
 from pipelineUtils.blob_functions import get_blob_content, write_to_blob, BlobMetadata
 from pipelineUtils.azure_openai import run_prompt
+import base64
+
+import io
+from PyPDF2 import PdfReader, PdfWriter
 
 config = Configuration()
 
@@ -18,6 +22,9 @@ NEXT_STAGE = config.get_value("NEXT_STAGE")
 app = df.DFApp(http_auth_level=func.AuthLevel.ANONYMOUS)
 
 import logging
+
+# use_docintel = os.getenv("USE_DOCINTEL_OUTPUT", "true").lower() == "true"
+
 
 # Blob-triggered starter
 @app.function_name(name="start_orchestrator_on_blob")
@@ -169,19 +176,96 @@ def process_blob(context):
     
     # Step 1: Extract text using Document Intelligence
     # text_result = yield context.call_activity("runDocIntel", blob_metadata) 
-    text_result_silver = yield context.call_activity("runDocIntel", blob_metadata_silver)
+    # text_result_silver = yield context.call_activity("runDocIntel", blob_metadata_silver)
     
     
     # Step 2: Silver AOAI
-    call_aoai_input_silver = {
-        # "text_result": text_result,
-        "text_result": text_result_silver,  # use filtered result
-        "instance_id": sub_orchestration_id, 
-        "prompt_file": "prompts_silver.yaml",
-        "blob_metadata": blob_metadata
-    }
+    # call_aoai_input_silver = {
+    #     # "text_result": text_result,
+    #     "text_result": text_result_silver,  # use filtered result
+    #     "instance_id": sub_orchestration_id, 
+    #     "prompt_file": "prompts_silver.yaml",
+    #     "blob_metadata": blob_metadata
+    # }
     
+    # json_str_silver = yield context.call_activity("callAoai", call_aoai_input_silver)
+    # task_result_silver = yield context.call_activity(
+    #     "writeToBlob", 
+    #     {"json_str": json_str_silver, "blob_name": blob_metadata["name"]}
+    # )
+    
+    # Step 1: Silver AOAI → optionally use DocIntel or raw PDF
+    # use_docintel = os.getenv("USE_DOCINTEL_OUTPUT", "true").lower() == "true"
+    use_docintel = config.get_value("USE_DOCINTEL_OUTPUT", default="true").lower() == "true" 
+    
+    def normalize_blob_name(container: str, raw_name: str) -> str:
+        if raw_name.startswith(container + "/"):
+            return raw_name[len(container)+1:]
+        return raw_name
+    
+    
+    # Step 1: Prepare PDF input
+    if use_docintel:
+        logging.info("[Silver] Using Document Intelligence output for AOAI.")
+        silver_input_content = yield context.call_activity("runDocIntel", blob_metadata_silver)
+        
+    else:
+        logging.info("[Silver] Skipping DocIntel — preparing base64-encoded PDF for GPT-4o.")
+
+        bronze_container = "bronze"
+        # blob_name = blob_metadata_silver["name"]
+        
+        blob_name = normalize_blob_name(bronze_container, blob_metadata_silver["name"])
+
+        # ✅ Step 1: Fetch full PDF bytes directly using get_blob_content
+        blob_bytes = get_blob_content(container_name=bronze_container, blob_path=blob_name)
+
+        if not isinstance(blob_bytes, (bytes, bytearray)):
+            logging.error("[Silver] Blob content is not in bytes format — cannot proceed.")
+            raise ValueError("Invalid blob content format. Expected bytes.")
+
+        logging.info(f"[Silver] Successfully fetched PDF bytes ({len(blob_bytes)} bytes)")
+
+        try:
+            # Step 2: Trim PDF to first 5 pages
+            pdf_reader = PdfReader(io.BytesIO(blob_bytes))
+            pdf_writer = PdfWriter()
+
+            pages_to_use = min(5, len(pdf_reader.pages))
+            for i in range(pages_to_use):
+                pdf_writer.add_page(pdf_reader.pages[i])
+
+            output_stream = io.BytesIO()
+            pdf_writer.write(output_stream)
+            output_stream.seek(0)
+            trimmed_bytes = output_stream.read()
+
+            logging.info(f"[Silver] Trimmed PDF to first {pages_to_use} pages")
+
+            # Step 3: Base64 encode the trimmed PDF using UTF-8
+            base64_string = base64.b64encode(trimmed_bytes).decode("utf-8")
+            silver_input_content = f"data:application/pdf;base64,{base64_string}"
+
+            logging.info("[Silver] PDF bytes wrapped and base64-encoded for GPT-4o processing")
+
+            input_type = "pdf_base64"
+
+        except Exception as e:
+            logging.error(f"[Silver] PDF trimming or encoding failed: {e}")
+            raise
+
+  
+    # Step 2: Silver AOAI
+    call_aoai_input_silver = {
+        "text_result": silver_input_content,
+        "instance_id": sub_orchestration_id,
+        "prompt_file": "prompts_silver.yaml",
+        "blob_metadata": blob_metadata,
+        "input_type": "docintel" if use_docintel else "pdf_base64"
+    }
+
     json_str_silver = yield context.call_activity("callAoai", call_aoai_input_silver)
+
     task_result_silver = yield context.call_activity(
         "writeToBlob", 
         {"json_str": json_str_silver, "blob_name": blob_metadata["name"]}

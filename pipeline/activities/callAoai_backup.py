@@ -75,7 +75,7 @@
 #         # Extract metadata
 #         date = blob_metadata.get("date", "N/A")
 #         document_type = blob_metadata.get("document_type", "N/A")
-#         persona = blob_metadata.get("persona", "N/A")
+#         # persona = blob_metadata.get("persona", "N/A")
 #         supplier_name = blob_metadata.get("supplier_name", "N/A")
 #         contract_number = blob_metadata.get("contract_number", "N/A")
 #         amount = blob_metadata.get("amount", "N/A")
@@ -90,7 +90,7 @@
 #         metadata_text = "\n".join([
 #             f"Date: {date if date else ''}",
 #             f"Document Type: {document_type if document_type else ''}",
-#             f"Persona: {persona if persona else ''}", 
+#             # f"Persona: {persona if persona else ''}", 
 #             f"supplier_name: {supplier_name if supplier_name else ''}",
 #             f"contract_number: {contract_number if contract_number else ''}",
 #             f"amount: {amount if amount else ''}"
@@ -113,7 +113,8 @@
 
 #         logging.info(f"callAoai.py: Full user prompt: {full_user_prompt}")
 #         logging.info(f"callAoai.py: System prompt: {prompt_json['system_prompt']}")
-#         response_content = run_prompt(prompt_json['system_prompt'], full_user_prompt)
+#         # response_content = run_prompt(prompt_json['system_prompt'], full_user_prompt)
+#         response_content = run_prompt(instance_id, prompt_json['system_prompt'], full_user_prompt)
 
 #         if response_content.startswith('```json') and response_content.endswith('```'):
 #             response_content = response_content.strip('`').replace('json', '', 1).strip()
