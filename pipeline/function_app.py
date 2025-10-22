@@ -6,7 +6,7 @@ from azure.ai.documentintelligence.models import AnalyzeResult, AnalyzeDocumentR
 
 from activities import getBlobContent, runDocIntel, callAoai, writeToBlob
 from configuration import Configuration
-
+import fitz  # PyMuPDF
 from pipelineUtils.prompts import load_prompts
 from pipelineUtils.blob_functions import get_blob_content, write_to_blob, BlobMetadata
 from pipelineUtils.azure_openai import run_prompt
@@ -227,28 +227,27 @@ def process_blob(context):
         logging.info(f"[Silver] Successfully fetched PDF bytes ({len(blob_bytes)} bytes)")
 
         try:
-            # Step 2: Trim PDF to first 5 pages
-            pdf_reader = PdfReader(io.BytesIO(blob_bytes))
-            pdf_writer = PdfWriter()
-
-            pages_to_use = min(5, len(pdf_reader.pages))
-            for i in range(pages_to_use):
-                pdf_writer.add_page(pdf_reader.pages[i])
-
-            output_stream = io.BytesIO()
-            pdf_writer.write(output_stream)
-            output_stream.seek(0)
-            trimmed_bytes = output_stream.read()
-
-            logging.info(f"[Silver] Trimmed PDF to first {pages_to_use} pages")
-
-            # Step 3: Base64 encode the trimmed PDF using UTF-8
-            base64_string = base64.b64encode(trimmed_bytes).decode("utf-8")
-            silver_input_content = f"data:application/pdf;base64,{base64_string}"
-
-            logging.info("[Silver] PDF bytes wrapped and base64-encoded for GPT-4o processing")
-
-            input_type = "pdf_base64"
+            # images = convert_from_bytes(blob_bytes)
+            # base64_images = []
+            # for img in images:
+            #     buf = io.BytesIO()
+            #     img.save(buf, format="PNG")          # or "JPEG" etc.
+            #     b64 = base64.b64encode(buf.getvalue()).decode("utf-8")
+            #     base64_images.append(b64)
+            base64_images = []
+            with fitz.open(stream=blob_bytes, filetype='pdf') as doc:
+                for page in doc:
+                    # Render page to a pixmap (image)
+                    pix = page.get_pixmap()
+                    # Convert pixmap to PNG bytes
+                    img_bytes = pix.tobytes("png")
+                    # Encode to base64
+                    b64 = base64.b64encode(img_bytes).decode("utf-8")
+                    base64_images.append(b64)
+            # for i, b64 in enumerate(base64_images):
+            #     print(f"Page {i+1} Base64 length: {len(b64)}")
+            #     print(b64[:100] + "...")  # Print first 100 characters of Base64 string
+            silver_input_content = ""  # No text content when using PDF images
 
         except Exception as e:
             logging.error(f"[Silver] PDF trimming or encoding failed: {e}")
@@ -261,7 +260,8 @@ def process_blob(context):
         "instance_id": sub_orchestration_id,
         "prompt_file": "prompts_silver.yaml",
         "blob_metadata": blob_metadata,
-        "input_type": "docintel" if use_docintel else "pdf_base64"
+        "input_type": "docintel" if use_docintel else "pdf_base64",
+        "base64_images": base64_images if not use_docintel else None
     }
 
     json_str_silver = yield context.call_activity("callAoai", call_aoai_input_silver)
